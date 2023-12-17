@@ -1,0 +1,45 @@
+---
+version: "3.8"
+services:
+
+  postgres:
+    image: postgres:15.3
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./pg_data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+
+  migration:
+    image: migrate/migrate
+    volumes:
+      - ./migrations:/migrations
+    entrypoint:
+      [
+        "migrate",
+        "-path",
+        "/migrations",
+        "-database",
+        "postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable",
+      ]
+    command: ["up"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  nats:
+    command: ["nats-streaming-server", "-cid", "test-cluster"]
+    image: nats-streaming:0.25.6-alpine3.18
+    restart: always
+    ports:
+      - "4222:4222"
+      - "8222:8222"
